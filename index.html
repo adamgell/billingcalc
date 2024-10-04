@@ -3,190 +3,68 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Enhanced Billable Utilization Calculator</title>
+    <title>Billable Utilization Calculator</title>
     <link rel="manifest" href="manifest.json">
     <meta name="theme-color" content="#4CAF50">
     <link rel="icon" href="icon-192x192.png" type="image/png">
     <style>
-        /* ... (previous styles) ... */
-        .project-list {
-            margin-top: 20px;
-            border: 1px solid #ddd;
-            padding: 10px;
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 600px;
+            margin: 0 auto;
+            padding: 20px;
         }
-        .project-item {
-            margin-bottom: 10px;
-            padding: 10px;
-            background-color: #f9f9f9;
+        .form-group {
+            margin-bottom: 15px;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+        }
+        input, button {
+            width: 100%;
+            padding: 8px;
+            box-sizing: border-box;
+        }
+        button {
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            cursor: pointer;
+            margin-top: 10px;
+        }
+        button:hover {
+            background-color: #45a049;
+        }
+        #result {
+            margin-top: 20px;
+            white-space: pre-line;
         }
     </style>
 </head>
 <body>
-    <h1>Enhanced Billable Utilization Calculator</h1>
-
-    <!-- Project Form -->
-    <h2>Add/Edit Project</h2>
+    <h1>Billable Utilization Calculator</h1>
     <div class="form-group">
-        <label for="projectName">Project Name:</label>
-        <input type="text" id="projectName" required>
+        <label for="currentHours">Current Billable Hours:</label>
+        <input type="number" id="currentHours" required>
     </div>
     <div class="form-group">
-        <label for="sessionsPerWeek">Working Sessions per Week:</label>
-        <input type="number" id="sessionsPerWeek" required>
+        <label for="targetUtilization">Target Utilization (%):</label>
+        <input type="number" id="targetUtilization" value="82" required>
     </div>
     <div class="form-group">
-        <label for="hoursPerSession">Billable Hours per Session:</label>
-        <input type="number" id="hoursPerSession" value="8" required>
-    </div>
-    <div class="form-group">
-        <label for="projectStartDate">Start Date:</label>
-        <input type="date" id="projectStartDate" required>
-    </div>
-    <div class="form-group">
-        <label for="projectEndDate">End Date (optional):</label>
-        <input type="date" id="projectEndDate">
-    </div>
-    <button onclick="saveProject()">Save Project</button>
-
-    <!-- Project List -->
-    <h2>Projects</h2>
-    <div id="projectList" class="project-list"></div>
-
-    <!-- Calculation Form -->
-    <h2>Calculate Utilization</h2>
-    <div class="form-group">
-        <label for="startDate">Calculation Start Date:</label>
+        <label for="startDate">Start Date:</label>
         <input type="date" id="startDate" required>
     </div>
     <div class="form-group">
-        <label for="endDate">Calculation End Date:</label>
+        <label for="endDate">End Date:</label>
         <input type="date" id="endDate" required>
     </div>
-    <button onclick="calculateUtilization()">Calculate</button>
-
+    <button onclick="calculate()">Calculate</button>
     <div id="result"></div>
 
     <script>
-        let db;
-
-        // Initialize IndexedDB
-        const dbName = 'ProjectsDB';
-        const request = indexedDB.open(dbName, 1);
-
-        request.onerror = (event) => {
-            console.error("IndexedDB error:", event.target.error);
-        };
-
-        request.onsuccess = (event) => {
-            db = event.target.result;
-            displayProjects();
-        };
-
-        request.onupgradeneeded = (event) => {
-            db = event.target.result;
-            const objectStore = db.createObjectStore("projects", { keyPath: "id", autoIncrement: true });
-            objectStore.createIndex("name", "name", { unique: false });
-            objectStore.createIndex("startDate", "startDate", { unique: false });
-        };
-
-        function saveProject() {
-            const project = {
-                name: document.getElementById('projectName').value,
-                sessionsPerWeek: parseInt(document.getElementById('sessionsPerWeek').value),
-                hoursPerSession: parseFloat(document.getElementById('hoursPerSession').value),
-                startDate: document.getElementById('projectStartDate').value,
-                endDate: document.getElementById('projectEndDate').value || null
-            };
-
-            const transaction = db.transaction(["projects"], "readwrite");
-            const objectStore = transaction.objectStore("projects");
-            const request = objectStore.add(project);
-
-            request.onsuccess = () => {
-                console.log("Project added successfully");
-                displayProjects();
-            };
-
-            request.onerror = () => {
-                console.error("Error adding project:", request.error);
-            };
-        }
-
-        function displayProjects() {
-            const projectList = document.getElementById('projectList');
-            projectList.innerHTML = '';
-
-            const objectStore = db.transaction("projects").objectStore("projects");
-            objectStore.openCursor().onsuccess = (event) => {
-                const cursor = event.target.result;
-                if (cursor) {
-                    const project = cursor.value;
-                    const projectDiv = document.createElement('div');
-                    projectDiv.className = 'project-item';
-                    projectDiv.innerHTML = `
-                        <h3>${project.name}</h3>
-                        <p>Sessions per week: ${project.sessionsPerWeek}</p>
-                        <p>Hours per session: ${project.hoursPerSession}</p>
-                        <p>Start date: ${project.startDate}</p>
-                        <p>End date: ${project.endDate || 'Ongoing'}</p>
-                    `;
-                    projectList.appendChild(projectDiv);
-                    cursor.continue();
-                }
-            };
-        }
-
-        function calculateUtilization() {
-            const startDate = new Date(document.getElementById('startDate').value);
-            const endDate = new Date(document.getElementById('endDate').value);
-            
-            const objectStore = db.transaction("projects").objectStore("projects");
-            let totalBillableHours = 0;
-
-            objectStore.openCursor().onsuccess = (event) => {
-                const cursor = event.target.result;
-                if (cursor) {
-                    const project = cursor.value;
-                    const projectStart = new Date(project.startDate);
-                    const projectEnd = project.endDate ? new Date(project.endDate) : new Date(3000, 0, 1); // Far future date for ongoing projects
-
-                    if (projectStart <= endDate && projectEnd >= startDate) {
-                        const overlapStart = new Date(Math.max(startDate, projectStart));
-                        const overlapEnd = new Date(Math.min(endDate, projectEnd));
-                        const weeks = Math.ceil((overlapEnd - overlapStart) / (7 * 24 * 60 * 60 * 1000));
-                        
-                        totalBillableHours += weeks * project.sessionsPerWeek * project.hoursPerSession;
-                    }
-                    cursor.continue();
-                } else {
-                    displayResults(totalBillableHours, startDate, endDate);
-                }
-            };
-        }
-
-        function displayResults(totalBillableHours, startDate, endDate) {
-            const workingDays = getWorkingDaysBetweenDates(startDate, endDate);
-            const totalWorkingHours = workingDays * 8; // Assuming 8-hour workdays
-            const utilization = (totalBillableHours / totalWorkingHours) * 100;
-
-            const resultDiv = document.getElementById('result');
-            resultDiv.innerHTML = `
-                <h3>Calculation Results</h3>
-                <p>Total Billable Hours: ${totalBillableHours.toFixed(2)}</p>
-                <p>Total Working Hours: ${totalWorkingHours}</p>
-                <p>Utilization: ${utilization.toFixed(2)}%</p>
-            `;
-        }
-
-        function getWorkingDaysBetweenDates(startDate, endDate) {
-            let workingDays = 0;
-            for (let d = new Date(startDate); d <= endDate; d.setDate(d.getDate() + 1)) {
-                if (d.getDay() !== 0 && d.getDay() !== 6) workingDays++;
-            }
-            return workingDays;
-        }
-
-        // Initialize date inputs
+        // Set default dates
         window.onload = function() {
             const today = new Date();
             const firstDay = new Date(today.getFullYear(), today.getMonth(), 1);
@@ -194,10 +72,48 @@
             
             document.getElementById('startDate').valueAsDate = firstDay;
             document.getElementById('endDate').valueAsDate = lastDay;
-            document.getElementById('projectStartDate').valueAsDate = today;
         };
 
-        // Register Service Worker (same as before)
+        function calculate() {
+            const currentHours = parseFloat(document.getElementById('currentHours').value);
+            const targetUtilization = parseFloat(document.getElementById('targetUtilization').value) / 100;
+            const startDate = new Date(document.getElementById('startDate').value);
+            const endDate = new Date(document.getElementById('endDate').value);
+            const currentDate = new Date();
+
+            let workingDays = 0;
+            let remainingWorkingDays = 0;
+
+            for (let day = new Date(startDate); day <= endDate; day.setDate(day.getDate() + 1)) {
+                if (day.getDay() !== 0 && day.getDay() !== 6) {
+                    workingDays++;
+                    if (day >= currentDate) {
+                        remainingWorkingDays++;
+                    }
+                }
+            }
+
+            const totalHours = workingDays * 8;
+            const targetHours = totalHours * targetUtilization;
+            const remainingHours = targetHours - currentHours;
+
+            const currentUtilization = (currentHours / totalHours) * 100;
+
+            const dailyHoursNeeded = remainingWorkingDays > 0 ? remainingHours / remainingWorkingDays : 0;
+
+            const result = `Date Range: ${startDate.toLocaleDateString()} - ${endDate.toLocaleDateString()}
+Working Days: ${workingDays}
+Remaining Working Days: ${remainingWorkingDays}
+Total Working Hours: ${totalHours}
+Current Utilization: ${currentUtilization.toFixed(2)}%
+Target Hours: ${targetHours.toFixed(2)}
+Remaining Hours: ${remainingHours.toFixed(2)}
+Daily Hours Needed: ${dailyHoursNeeded.toFixed(2)}`;
+
+            document.getElementById('result').textContent = result;
+        }
+
+        // Register Service Worker
         if ('serviceWorker' in navigator) {
             window.addEventListener('load', () => {
                 navigator.serviceWorker.register('service-worker.js')
